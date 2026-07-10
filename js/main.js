@@ -1,5 +1,5 @@
 /* ======================================================================
-   MUNDO DENTAL KIDS by Galucy — Interacciones
+   BAMBINIS — Guardería y Estancia Infantil — Interacciones
    Preloader · Partículas · Typewriter · Scroll reveal · Nav · Contador ·
    Lightbox de galería · Formulario a WhatsApp
    ====================================================================== */
@@ -7,6 +7,7 @@
   'use strict';
 
   var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var isFinePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   function debounce(fn, wait) {
     var t;
@@ -42,7 +43,7 @@
   function startTypewriter() {
     var el = document.getElementById('typewriter-text');
     if (!el) return;
-    var text = 'es una aventura espacial.';
+    var text = 'es una aventura para crecer.';
 
     if (reducedMotion) { el.textContent = text; return; }
 
@@ -58,7 +59,7 @@
 
   /* ---------------- Scroll reveal ---------------- */
   function initReveal() {
-    var items = document.querySelectorAll('.reveal-up,.reveal-left,.reveal-right,.reveal-scale');
+    var items = document.querySelectorAll('.reveal-up,.reveal-left,.reveal-right,.reveal-scale,.reveal-blur,.reveal-mask');
     if (!items.length) return;
 
     items.forEach(function (el) {
@@ -119,6 +120,10 @@
     var toggle = document.getElementById('nav-toggle');
     var panel = document.getElementById('mobile-nav');
     if (!toggle || !panel) return;
+
+    panel.querySelectorAll('.mobile-nav-link').forEach(function (link, i) {
+      link.style.setProperty('--i', i);
+    });
 
     function close() {
       toggle.setAttribute('aria-expanded', 'false');
@@ -185,7 +190,7 @@
 
     var particles = [], w = 0, h = 0, dpr = 1, running = false;
     var mouse = { x: null, y: null };
-    var colors = ['#C24BC0', '#3EC6EA', '#7A2482', '#9E31A0', '#FFC72C'];
+    var colors = ['#1084C4', '#7EC144', '#0C6699', '#F04A42', '#22A8E5'];
 
     function resize() {
       var rect = hero.getBoundingClientRect();
@@ -241,7 +246,7 @@
             ctx.beginPath();
             ctx.moveTo(p.x, p.y);
             ctx.lineTo(q.x, q.y);
-            ctx.strokeStyle = 'rgba(158,49,160,' + (0.22 * (1 - dist / linkDist)) + ')';
+            ctx.strokeStyle = 'rgba(16,132,196,' + (0.22 * (1 - dist / linkDist)) + ')';
             ctx.lineWidth = 1;
             ctx.stroke();
           }
@@ -273,6 +278,124 @@
       }, { threshold: 0 });
       io.observe(hero);
     }
+  }
+
+  /* ---------------- Hero: parallax de scroll (imagen + manchas) ---------------- */
+  function initHeroParallax() {
+    if (reducedMotion) return;
+    var hero = document.querySelector('.hero');
+    var visual = document.querySelector('.hero-visual');
+    var blobs = document.querySelectorAll('.hero-blob');
+    if (!hero || !visual) return;
+
+    var inView = true, ticking = false;
+
+    function apply() {
+      ticking = false;
+      var rect = hero.getBoundingClientRect();
+      var progress = Math.min(Math.max(-rect.top / (rect.height || 1), 0), 1);
+      var maxShift = window.innerWidth < 720 ? 22 : 60;
+      var shift = progress * maxShift;
+      visual.style.setProperty('--parallax-y', shift.toFixed(1) + 'px');
+      blobs.forEach(function (b, i) {
+        b.style.transform = 'translateY(' + (shift * (0.35 + i * 0.18)).toFixed(1) + 'px)';
+      });
+    }
+
+    function onScroll() {
+      if (!inView || ticking) return;
+      ticking = true;
+      requestAnimationFrame(apply);
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', debounce(onScroll, 150));
+
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          inView = entry.isIntersecting;
+          if (inView) onScroll();
+        });
+      }, { threshold: 0 });
+      io.observe(hero);
+    }
+  }
+
+  /* ---------------- Tilt 3D: imagen del hero y tarjetas de servicio (solo mouse fino) ---------------- */
+  function attachTilt(el, maxDeg) {
+    var raf = null, latestEvent = null;
+
+    function apply() {
+      raf = null;
+      if (!latestEvent) return;
+      var rect = el.getBoundingClientRect();
+      var px = (latestEvent.clientX - rect.left) / rect.width - 0.5;
+      var py = (latestEvent.clientY - rect.top) / rect.height - 0.5;
+      el.style.setProperty('--tilt-x', (py * -maxDeg).toFixed(2) + 'deg');
+      el.style.setProperty('--tilt-y', (px * maxDeg).toFixed(2) + 'deg');
+    }
+
+    el.addEventListener('mouseenter', function () { el.classList.add('is-tilting'); });
+    el.addEventListener('mousemove', function (e) {
+      latestEvent = e;
+      if (!raf) raf = requestAnimationFrame(apply);
+    });
+    el.addEventListener('mouseleave', function () {
+      el.classList.remove('is-tilting');
+      el.style.setProperty('--tilt-x', '0deg');
+      el.style.setProperty('--tilt-y', '0deg');
+      latestEvent = null;
+    });
+  }
+
+  function initTilt() {
+    if (reducedMotion || !isFinePointer) return;
+    var visual = document.querySelector('.hero-visual');
+    if (visual) attachTilt(visual, 8);
+    document.querySelectorAll('.service-card').forEach(function (card) { attachTilt(card, 5); });
+  }
+
+  /* ---------------- Botones magnéticos (solo mouse fino) ---------------- */
+  function initMagnetic() {
+    if (reducedMotion || !isFinePointer) return;
+    var els = document.querySelectorAll('.magnetic');
+    if (!els.length) return;
+
+    els.forEach(function (el) {
+      var raf = null, latestEvent = null;
+      var strength = 0.3;
+
+      function apply() {
+        raf = null;
+        if (!latestEvent) return;
+        var rect = el.getBoundingClientRect();
+        var mx = latestEvent.clientX - (rect.left + rect.width / 2);
+        var my = latestEvent.clientY - (rect.top + rect.height / 2);
+        el.style.transform = 'translate(' + (mx * strength).toFixed(1) + 'px,' + (my * strength - 3).toFixed(1) + 'px)';
+      }
+
+      el.addEventListener('mousemove', function (e) {
+        latestEvent = e;
+        if (!raf) raf = requestAnimationFrame(apply);
+      });
+      el.addEventListener('mouseleave', function () {
+        latestEvent = null;
+        el.style.transform = '';
+      });
+    });
+  }
+
+  /* ---------------- Shimmer mientras cargan las imágenes diferidas ---------------- */
+  function initImageShimmer() {
+    var imgs = document.querySelectorAll('main img[loading="lazy"]');
+    imgs.forEach(function (img) {
+      if (img.complete) return;
+      img.classList.add('is-loading');
+      function done() { img.classList.remove('is-loading'); }
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
   }
 
   /* ---------------- Gallery lightbox ---------------- */
@@ -323,15 +446,14 @@
     var specialtyEl = document.getElementById('specialty');
     var messageEl = document.getElementById('message');
 
-    var WHATSAPP_NUMBER = '5215578372645';
+    var WHATSAPP_NUMBER = '5219381079202';
 
     var SPECIALTY_NAMES = {
-      odontopediatria: 'Odontopediatría General',
-      ortodoncia: 'Ortodoncia Infantil',
-      preventiva: 'Odontología Preventiva',
-      rehabilitacion: 'Rehabilitación Oral Infantil',
-      urgencias: 'Urgencias Dentales',
-      'primera-visita': 'Primera Visita / Estimulación Temprana',
+      informes: 'Información General / Inscripción',
+      lactantes: 'Lactantes y Maternal',
+      tardes: 'Guardería por las Tardes',
+      'consejo-tecnico': 'Cobertura por Consejo Técnico / Suspensión',
+      horario: 'Ajustar un Horario Especial',
       'no-se': 'aún no sé, quiero información'
     };
 
@@ -345,11 +467,11 @@
 
       var specialtyName = SPECIALTY_NAMES[specialtyEl.value];
       if (!specialtyName) {
-        showAlert('Selecciona una especialidad para continuar.');
+        showAlert('Selecciona una opción para continuar.');
         return;
       }
 
-      var text = 'Hola Mundo Dental Kids, mi nombre es ' + nameEl.value.trim() +
+      var text = 'Hola Bambinis, mi nombre es ' + nameEl.value.trim() +
         ' (tel. ' + phoneEl.value.trim() + '). Me interesa: ' + specialtyName + '. ' +
         messageEl.value.trim();
 
@@ -386,6 +508,10 @@
   initMobileNav();
   initCounters();
   initParticles();
+  initHeroParallax();
+  initTilt();
+  initMagnetic();
+  initImageShimmer();
   initLightbox();
   initContactForm();
   initBackToTop();
