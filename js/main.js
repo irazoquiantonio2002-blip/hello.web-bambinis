@@ -1,432 +1,161 @@
-/* ======================================================================
-   BAMBINIS — Guardería y Estancia Infantil — Interacciones
-   Preloader · Partículas · Typewriter · Scroll reveal · Nav · Contador ·
-   Lightbox de galería · Formulario a WhatsApp
-   ====================================================================== */
+/* ============================================================
+   BAMBINIS — Guardería y Estancia Infantil — main.js
+   ============================================================ */
 (function () {
   'use strict';
 
-  var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var isFinePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  /* ── 1. Loader ─────────────────────────────────────────── */
+  const loader = document.getElementById('loader');
 
-  function debounce(fn, wait) {
-    var t;
-    return function () {
-      var ctx = this, args = arguments;
-      clearTimeout(t);
-      t = setTimeout(function () { fn.apply(ctx, args); }, wait);
-    };
-  }
-
-  /* ---------------- Preloader ---------------- */
-  function initPreloader() {
-    var preloader = document.getElementById('preloader');
-    if (!preloader) { startTypewriter(); return; }
-
-    document.body.classList.add('no-scroll');
-
-    var minTime = new Promise(function (resolve) { setTimeout(resolve, 900); });
-    var loaded = new Promise(function (resolve) {
-      if (document.readyState === 'complete') resolve();
-      else window.addEventListener('load', function () { resolve(); }, { once: true });
-    });
-
-    Promise.all([minTime, loaded]).then(function () {
-      preloader.classList.add('is-hidden');
-      document.body.classList.remove('no-scroll');
-      document.body.classList.add('is-loaded');
-      startTypewriter();
-    });
-  }
-
-  /* ---------------- Typewriter (hero) ---------------- */
-  function startTypewriter() {
-    var el = document.getElementById('typewriter-text');
-    if (!el) return;
-    var text = 'es una aventura para crecer.';
-
-    if (reducedMotion) { el.textContent = text; return; }
-
-    var i = 0;
-    (function type() {
-      el.textContent = text.slice(0, i);
-      if (i <= text.length) {
-        i++;
-        setTimeout(type, 40 + Math.random() * 45);
-      }
-    })();
-  }
-
-  /* ---------------- Scroll reveal ---------------- */
-  function initReveal() {
-    var items = document.querySelectorAll('.reveal-up,.reveal-left,.reveal-right,.reveal-scale,.reveal-blur,.reveal-mask');
-    if (!items.length) return;
-
-    items.forEach(function (el) {
-      var delay = parseInt(el.getAttribute('data-delay') || '0', 10);
-      if (delay) el.style.transitionDelay = (delay * 90) + 'ms';
-    });
-
-    if (!('IntersectionObserver' in window)) {
-      items.forEach(function (el) { el.classList.add('is-visible'); });
-      return;
-    }
-
-    // threshold 0 + a small negative bottom margin: fires as soon as an element
-    // starts entering the viewport, regardless of the element's own height
-    // (a fixed % threshold would never fire for elements taller than the viewport).
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-visible');
-          io.unobserve(entry.target);
-        }
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      loader.classList.add('out');
+      document.body.classList.add('loaded');
+      // Hero bg scale-in
+      const heroBg = document.querySelector('.hero-bg');
+      if (heroBg) heroBg.classList.add('loaded');
+      // Trigger hero text animations
+      ['hero-badge','hero-sub','hero-ctas','hero-trust'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('in');
       });
-    }, { threshold: 0, rootMargin: '0px 0px -8% 0px' });
+    }, 700);
+  });
 
-    items.forEach(function (el) { io.observe(el); });
-  }
+  /* ── 2. Navbar scroll ──────────────────────────────────── */
+  const navbar = document.getElementById('navbar');
+  window.addEventListener('scroll', () => {
+    navbar.classList.toggle('scrolled', window.scrollY > 40);
+  }, { passive: true });
 
-  /* ---------------- Header: scroll state + active link ---------------- */
-  function initHeader() {
-    var header = document.getElementById('site-header');
-    if (!header) return;
+  /* ── 3. Hamburger ──────────────────────────────────────── */
+  const burger  = document.getElementById('hamburger');
+  const mobMenu = document.getElementById('mob-menu');
 
-    var progress = document.getElementById('scroll-progress');
+  burger.addEventListener('click', () => {
+    const open = mobMenu.classList.toggle('open');
+    burger.classList.toggle('open', open);
+    burger.setAttribute('aria-expanded', String(open));
+  });
 
-    function onScroll() {
-      header.classList.toggle('is-scrolled', window.scrollY > 30);
-      if (progress) {
-        var scrollable = document.documentElement.scrollHeight - window.innerHeight;
-        var pct = scrollable > 0 ? (window.scrollY / scrollable) * 100 : 0;
-        progress.style.width = Math.min(Math.max(pct, 0), 100).toFixed(1) + '%';
+  mobMenu.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => {
+      mobMenu.classList.remove('open');
+      burger.classList.remove('open');
+      burger.setAttribute('aria-expanded', 'false');
+    });
+  });
+
+  /* ── 4. Scroll Reveal (IntersectionObserver) ───────────── */
+  const revealEls = document.querySelectorAll('.reveal');
+  const revealObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('active');
+        revealObs.unobserve(e.target);
       }
-    }
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-
-    var sections = document.querySelectorAll('main section[id]');
-    var links = document.querySelectorAll('.nav-link');
-    if (!sections.length || !links.length || !('IntersectionObserver' in window)) return;
-
-    var map = {};
-    links.forEach(function (l) { map[l.getAttribute('href').replace('#', '')] = l; });
-
-    var navIo = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        var link = map[entry.target.id];
-        if (!link || !entry.isIntersecting) return;
-        links.forEach(function (l) { l.classList.remove('is-active'); });
-        link.classList.add('is-active');
-      });
-    }, { rootMargin: '-45% 0px -50% 0px' });
-
-    sections.forEach(function (s) { navIo.observe(s); });
-  }
-
-  /* ---------------- Mobile navigation ---------------- */
-  function initMobileNav() {
-    var toggle = document.getElementById('nav-toggle');
-    var panel = document.getElementById('mobile-nav');
-    if (!toggle || !panel) return;
-
-    panel.querySelectorAll('.mobile-nav-link').forEach(function (link, i) {
-      link.style.setProperty('--i', i);
     });
+  }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+  revealEls.forEach(el => revealObs.observe(el));
 
-    function close() {
-      toggle.setAttribute('aria-expanded', 'false');
-      panel.classList.remove('is-open');
-      document.body.classList.remove('no-scroll');
-    }
-    function open() {
-      toggle.setAttribute('aria-expanded', 'true');
-      panel.classList.add('is-open');
-      document.body.classList.add('no-scroll');
-    }
-
-    toggle.addEventListener('click', function () {
-      var isOpen = toggle.getAttribute('aria-expanded') === 'true';
-      if (isOpen) close(); else open();
-    });
-    panel.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', close); });
-    window.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && panel.classList.contains('is-open')) close();
-    });
-  }
-
-  /* ---------------- Animated stat counters ---------------- */
-  function initCounters() {
-    var counters = document.querySelectorAll('.stat-number');
-    if (!counters.length) return;
-
-    function animate(el) {
-      var target = parseFloat(el.getAttribute('data-target')) || 0;
-      var prefix = el.getAttribute('data-prefix') || '';
-      var suffix = el.getAttribute('data-suffix') || '';
-
-      if (reducedMotion) { el.textContent = prefix + target + suffix; return; }
-
-      var duration = 1300, start = null;
-      function step(ts) {
-        if (start === null) start = ts;
-        var progress = Math.min((ts - start) / duration, 1);
-        var eased = 1 - Math.pow(1 - progress, 3);
-        el.textContent = prefix + Math.round(target * eased) + suffix;
-        if (progress < 1) requestAnimationFrame(step);
+  /* ── 5. Stat counter animation ─────────────────────────── */
+  const statEls = document.querySelectorAll('[data-count]');
+  const statObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        countUp(e.target);
+        statObs.unobserve(e.target);
       }
-      requestAnimationFrame(step);
-    }
-
-    if (!('IntersectionObserver' in window)) { counters.forEach(animate); return; }
-
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) { animate(entry.target); io.unobserve(entry.target); }
-      });
-    }, { threshold: 0.6 });
-
-    counters.forEach(function (c) { io.observe(c); });
-  }
-
-  /* ---------------- Hero particle network ---------------- */
-  function initParticles() {
-    var canvas = document.getElementById('particles-canvas');
-    if (!canvas) return;
-    var hero = canvas.closest('.hero');
-    if (!hero) return;
-    var ctx = canvas.getContext('2d');
-
-    var particles = [], w = 0, h = 0, dpr = 1, running = false;
-    var mouse = { x: null, y: null };
-    var colors = ['#1084C4', '#7EC144', '#0C6699', '#F04A42', '#22A8E5'];
-
-    function resize() {
-      var rect = hero.getBoundingClientRect();
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = canvas.width = Math.max(rect.width, 1) * dpr;
-      h = canvas.height = Math.max(rect.height, 1) * dpr;
-      canvas.style.width = rect.width + 'px';
-      canvas.style.height = rect.height + 'px';
-
-      var count = Math.round((rect.width * rect.height) / 16000);
-      count = Math.max(26, Math.min(count, 85));
-      particles = [];
-      for (var i = 0; i < count; i++) {
-        particles.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          vx: (Math.random() - 0.5) * 0.25 * dpr,
-          vy: (Math.random() - 0.5) * 0.25 * dpr,
-          r: (Math.random() * 1.6 + 0.8) * dpr,
-          c: colors[i % colors.length]
-        });
-      }
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, w, h);
-      var linkDist = 130 * dpr;
-
-      for (var i = 0; i < particles.length; i++) {
-        var p = particles[i];
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0 || p.x > w) p.vx *= -1;
-        if (p.y < 0 || p.y > h) p.vy *= -1;
-
-        if (mouse.x !== null) {
-          var dx = p.x - mouse.x, dy = p.y - mouse.y;
-          var d = Math.sqrt(dx * dx + dy * dy) || 1;
-          if (d < 160 * dpr) { p.x += (dx / d) * 0.4; p.y += (dy / d) * 0.4; }
-        }
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.globalAlpha = 0.55;
-        ctx.fillStyle = p.c;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-
-        for (var j = i + 1; j < particles.length; j++) {
-          var q = particles[j];
-          var ddx = p.x - q.x, ddy = p.y - q.y;
-          var dist = Math.sqrt(ddx * ddx + ddy * ddy);
-          if (dist < linkDist) {
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(q.x, q.y);
-            ctx.strokeStyle = 'rgba(16,132,196,' + (0.22 * (1 - dist / linkDist)) + ')';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          }
-        }
-      }
-      if (running) requestAnimationFrame(draw);
-    }
-
-    function start() { if (!running && !reducedMotion) { running = true; requestAnimationFrame(draw); } }
-    function stop() { running = false; }
-
-    resize();
-    if (reducedMotion) { draw(); return; }
-
-    start();
-    window.addEventListener('resize', debounce(resize, 200));
-    hero.addEventListener('mousemove', function (e) {
-      var rect = hero.getBoundingClientRect();
-      mouse.x = (e.clientX - rect.left) * dpr;
-      mouse.y = (e.clientY - rect.top) * dpr;
     });
-    hero.addEventListener('mouseleave', function () { mouse.x = null; mouse.y = null; });
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden) stop(); else start();
-    });
-    if ('IntersectionObserver' in window) {
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) { entry.isIntersecting ? start() : stop(); });
-      }, { threshold: 0 });
-      io.observe(hero);
-    }
+  }, { threshold: 0.6 });
+  statEls.forEach(el => statObs.observe(el));
+
+  function countUp(el) {
+    const target   = parseFloat(el.dataset.count);
+    const suffix   = el.dataset.suffix  || '';
+    const prefix   = el.dataset.prefix  || '';
+    const decimals = el.dataset.decimals ? parseInt(el.dataset.decimals) : 0;
+    const dur      = 2000;
+    const start    = performance.now();
+
+    function ease(t) { return 1 - Math.pow(1 - t, 3); }
+
+    (function tick(now) {
+      const progress = Math.min((now - start) / dur, 1);
+      const val = ease(progress) * target;
+      el.textContent = prefix + (decimals > 0
+        ? val.toFixed(decimals)
+        : Math.round(val).toLocaleString('es-MX')) + suffix;
+      if (progress < 1) requestAnimationFrame(tick);
+    })(start);
   }
 
-  /* ---------------- Hero: parallax de scroll (imagen + manchas) ---------------- */
-  function initHeroParallax() {
-    if (reducedMotion) return;
-    var hero = document.querySelector('.hero');
-    var visual = document.querySelector('.hero-visual');
-    var blobs = document.querySelectorAll('.hero-blob');
-    if (!hero || !visual) return;
-
-    var inView = true, ticking = false;
-
-    function apply() {
-      ticking = false;
-      var rect = hero.getBoundingClientRect();
-      var progress = Math.min(Math.max(-rect.top / (rect.height || 1), 0), 1);
-      var maxShift = window.innerWidth < 720 ? 22 : 60;
-      var shift = progress * maxShift;
-      visual.style.setProperty('--parallax-y', shift.toFixed(1) + 'px');
-      blobs.forEach(function (b, i) {
-        b.style.transform = 'translateY(' + (shift * (0.35 + i * 0.18)).toFixed(1) + 'px)';
-      });
-    }
-
-    function onScroll() {
-      if (!inView || ticking) return;
-      ticking = true;
-      requestAnimationFrame(apply);
-    }
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', debounce(onScroll, 150));
-
-    if ('IntersectionObserver' in window) {
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          inView = entry.isIntersecting;
-          if (inView) onScroll();
-        });
-      }, { threshold: 0 });
-      io.observe(hero);
-    }
+  /* ── 6. Marquee fill ────────────────────────────────────── */
+  const marqueeInner = document.querySelector('.marquee-inner');
+  if (marqueeInner) {
+    const items = [
+      'Guardería y Estancia Infantil', 'Niños de 2 a 10 Años', 'Horario Extendido 7:30–7:00',
+      'Inscripciones Todo el Año', 'Fracc. Justo Sierra', 'Cupo Limitado',
+      'Lactantes y Maternal', 'Alimentos Incluidos', 'Ciudad del Carmen, Campeche'
+    ];
+    const full = [...items, ...items, ...items, ...items];
+    marqueeInner.innerHTML = full.map(t => `<span>${t}</span>`).join('');
   }
 
-  /* ---------------- Tilt 3D: imagen del hero y tarjetas de servicio (solo mouse fino) ---------------- */
-  function attachTilt(el, maxDeg) {
-    var raf = null, latestEvent = null;
+  /* ── 7. WhatsApp form ──────────────────────────────────── */
+  const form = document.getElementById('wa-form');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name     = (document.getElementById('f-name')    || {}).value?.trim() || '';
+      const interest = (document.getElementById('f-interest') || {}).value         || '';
+      const message  = (document.getElementById('f-msg')     || {}).value?.trim()  || '';
 
-    function apply() {
-      raf = null;
-      if (!latestEvent) return;
-      var rect = el.getBoundingClientRect();
-      var px = (latestEvent.clientX - rect.left) / rect.width - 0.5;
-      var py = (latestEvent.clientY - rect.top) / rect.height - 0.5;
-      el.style.setProperty('--tilt-x', (py * -maxDeg).toFixed(2) + 'deg');
-      el.style.setProperty('--tilt-y', (px * maxDeg).toFixed(2) + 'deg');
-    }
-
-    el.addEventListener('mouseenter', function () { el.classList.add('is-tilting'); });
-    el.addEventListener('mousemove', function (e) {
-      latestEvent = e;
-      if (!raf) raf = requestAnimationFrame(apply);
-    });
-    el.addEventListener('mouseleave', function () {
-      el.classList.remove('is-tilting');
-      el.style.setProperty('--tilt-x', '0deg');
-      el.style.setProperty('--tilt-y', '0deg');
-      latestEvent = null;
-    });
-  }
-
-  function initTilt() {
-    if (reducedMotion || !isFinePointer) return;
-    var visual = document.querySelector('.hero-visual');
-    if (visual) attachTilt(visual, 8);
-    document.querySelectorAll('.service-card').forEach(function (card) { attachTilt(card, 5); });
-  }
-
-  /* ---------------- Botones magnéticos (solo mouse fino) ---------------- */
-  function initMagnetic() {
-    if (reducedMotion || !isFinePointer) return;
-    var els = document.querySelectorAll('.magnetic');
-    if (!els.length) return;
-
-    els.forEach(function (el) {
-      var raf = null, latestEvent = null;
-      var strength = 0.3;
-
-      function apply() {
-        raf = null;
-        if (!latestEvent) return;
-        var rect = el.getBoundingClientRect();
-        var mx = latestEvent.clientX - (rect.left + rect.width / 2);
-        var my = latestEvent.clientY - (rect.top + rect.height / 2);
-        el.style.transform = 'translate(' + (mx * strength).toFixed(1) + 'px,' + (my * strength - 3).toFixed(1) + 'px)';
+      if (!name || !message) {
+        showFormError('Por favor completa tu nombre y cuéntanos sobre tu hijo(a).');
+        return;
       }
 
-      el.addEventListener('mousemove', function (e) {
-        latestEvent = e;
-        if (!raf) raf = requestAnimationFrame(apply);
-      });
-      el.addEventListener('mouseleave', function () {
-        latestEvent = null;
-        el.style.transform = '';
-      });
+      const phone = '5219381079202';
+      const text  = encodeURIComponent(
+        `Hola Bambinis 🎈\n\nSoy *${name}*.\nMe interesa: *${interest}*.\n\n${message}`
+      );
+      window.open(`https://wa.me/${phone}?text=${text}`, '_blank', 'noopener,noreferrer');
     });
   }
 
-  /* ---------------- Shimmer mientras cargan las imágenes diferidas ---------------- */
-  function initImageShimmer() {
-    var imgs = document.querySelectorAll('main img[loading="lazy"]');
-    imgs.forEach(function (img) {
-      if (img.complete) return;
-      img.classList.add('is-loading');
-      function done() { img.classList.remove('is-loading'); }
-      img.addEventListener('load', done, { once: true });
-      img.addEventListener('error', done, { once: true });
-    });
+  function showFormError(msg) {
+    let err = document.getElementById('form-error');
+    if (!err) {
+      err = document.createElement('p');
+      err.id = 'form-error';
+      err.style.cssText = 'color:#f87171;font-size:13px;margin-top:12px;text-align:center;';
+      form.appendChild(err);
+    }
+    err.textContent = msg;
+    setTimeout(() => { if (err) err.textContent = ''; }, 4000);
   }
 
-  /* ---------------- Gallery lightbox ---------------- */
-  function initLightbox() {
-    var items = document.querySelectorAll('.gallery-item');
-    var lightbox = document.getElementById('lightbox');
+  /* ── 7b. Gallery lightbox ──────────────────────────────── */
+  (function initLightbox() {
+    const items = document.querySelectorAll('.gallery-item');
+    const lightbox = document.getElementById('lightbox');
     if (!items.length || !lightbox) return;
 
-    var itemsArr = Array.prototype.slice.call(items);
-    var imgEl = document.getElementById('lightbox-img');
-    var captionEl = document.getElementById('lightbox-caption');
-    var counterEl = document.getElementById('lightbox-counter');
-    var closeBtn = document.getElementById('lightbox-close');
-    var prevBtn = document.getElementById('lightbox-prev');
-    var nextBtn = document.getElementById('lightbox-next');
-    var lastFocused = null;
-    var currentIndex = 0;
+    const itemsArr = Array.prototype.slice.call(items);
+    const imgEl = document.getElementById('lightbox-img');
+    const captionEl = document.getElementById('lightbox-caption');
+    const counterEl = document.getElementById('lightbox-counter');
+    const closeBtn = document.getElementById('lightbox-close');
+    const prevBtn = document.getElementById('lightbox-prev');
+    const nextBtn = document.getElementById('lightbox-next');
+    let lastFocused = null;
+    let currentIndex = 0;
 
     function show(index) {
       currentIndex = (index + itemsArr.length) % itemsArr.length;
-      var item = itemsArr[currentIndex];
-      var thumb = item.querySelector('img');
+      const item = itemsArr[currentIndex];
+      const thumb = item.querySelector('img');
       imgEl.src = item.getAttribute('data-full');
       imgEl.alt = thumb ? thumb.alt : '';
       captionEl.textContent = item.getAttribute('data-caption') || '';
@@ -438,109 +167,192 @@
       show(index);
       lightbox.classList.add('is-open');
       lightbox.setAttribute('aria-hidden', 'false');
-      document.body.classList.add('no-scroll');
       closeBtn.focus();
     }
     function close() {
       lightbox.classList.remove('is-open');
       lightbox.setAttribute('aria-hidden', 'true');
-      document.body.classList.remove('no-scroll');
       if (lastFocused) lastFocused.focus();
     }
 
-    itemsArr.forEach(function (item, i) { item.addEventListener('click', function () { open(i); }); });
+    itemsArr.forEach((item, i) => item.addEventListener('click', () => open(i)));
     closeBtn.addEventListener('click', close);
-    if (prevBtn) prevBtn.addEventListener('click', function () { show(currentIndex - 1); });
-    if (nextBtn) nextBtn.addEventListener('click', function () { show(currentIndex + 1); });
-    lightbox.addEventListener('click', function (e) { if (e.target === lightbox) close(); });
-    window.addEventListener('keydown', function (e) {
+    if (prevBtn) prevBtn.addEventListener('click', () => show(currentIndex - 1));
+    if (nextBtn) nextBtn.addEventListener('click', () => show(currentIndex + 1));
+    lightbox.addEventListener('click', (e) => { if (e.target === lightbox) close(); });
+    window.addEventListener('keydown', (e) => {
       if (!lightbox.classList.contains('is-open')) return;
       if (e.key === 'Escape') close();
       else if (e.key === 'ArrowLeft') show(currentIndex - 1);
       else if (e.key === 'ArrowRight') show(currentIndex + 1);
     });
+  }());
+
+  /* ── 8. Footer year ─────────────────────────────────────── */
+  const yr = document.getElementById('year');
+  if (yr) yr.textContent = new Date().getFullYear();
+
+  /* ── 9. Hero Canvas — Orbs + Sparks ────────────────────── */
+  const canvas = document.getElementById('hero-canvas');
+  const heroEl = document.getElementById('hero');
+  if (!canvas || !heroEl) return;
+
+  const ctx = canvas.getContext('2d');
+  let raf = null, orbs = [], sparks = [], W = 0, H = 0;
+
+  function resizeCanvas() {
+    W = canvas.width  = heroEl.offsetWidth;
+    H = canvas.height = heroEl.offsetHeight;
+    spawnOrbs();
+    spawnSparks();
   }
 
-  /* ---------------- Contact form → WhatsApp ---------------- */
-  function initContactForm() {
-    var form = document.getElementById('contact-form');
-    if (!form) return;
+  /* Large ambient orb */
+  class Orb {
+    constructor(cold) { this.reset(cold ?? true); }
+    reset(cold) {
+      this.r  = Math.random() * 300 + 180;
+      this.x  = cold ? Math.random() * W : (Math.random() > 0.5 ? -this.r : W + this.r);
+      this.y  = cold ? Math.random() * H : Math.random() * H;
+      this.vx = (Math.random() - 0.5) * 0.38;
+      this.vy = (Math.random() - 0.5) * 0.32;
+      const palette = [
+        [ 34, 168, 229, 0.05 ],
+        [ 16, 132, 196, 0.055],
+        [255, 255, 255, 0.018],
+        [126, 193,  68, 0.03 ],
+        [240,  74,  66, 0.028],
+      ];
+      const [r,g,b,a] = palette[Math.floor(Math.random() * palette.length)];
+      this.color = `rgba(${r},${g},${b},${a})`;
+    }
+    tick() {
+      this.x += this.vx; this.y += this.vy;
+      if (this.x - this.r > W + 60 || this.x + this.r < -60 ||
+          this.y - this.r > H + 60 || this.y + this.r < -60) this.reset(false);
+    }
+    draw() {
+      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r);
+      g.addColorStop(0, this.color); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+    }
+  }
 
-    var alertBox = document.getElementById('form-alert');
-    var nameEl = document.getElementById('name');
-    var phoneEl = document.getElementById('phone');
-    var specialtyEl = document.getElementById('specialty');
-    var messageEl = document.getElementById('message');
+  /* Small glowing spark that floats upward */
+  class Spark {
+    constructor(initY) { this._init(initY !== undefined ? initY : null); }
+    _init(startY) {
+      this.x    = Math.random() * W;
+      this.y    = startY !== null ? startY : H + 5;
+      this.vx   = (Math.random() - 0.5) * 0.55;
+      this.vy   = -(Math.random() * 0.65 + 0.28);
+      this.size = Math.random() * 1.7 + 0.45;
+      this.life  = startY !== null ? Math.random() : 1;
+      this.decay = Math.random() * 0.003 + 0.0014;
+      this.hue   = Math.random() * 40 + 190;
+    }
+    tick() {
+      this.x += this.vx; this.y += this.vy; this.life -= this.decay;
+      if (this.life <= 0 || this.y < -10) this._init(null);
+    }
+    draw() {
+      const a = this.life * 0.68;
+      const r = this.size * 3.8;
+      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, r);
+      g.addColorStop(0, `hsla(${this.hue},100%,86%,${a})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+    }
+  }
 
-    var WHATSAPP_NUMBER = '5219381079202';
+  function spawnOrbs() {
+    const count = W < 768 ? 5 : 10;
+    orbs = Array.from({ length: count }, () => new Orb(true));
+  }
 
-    var SPECIALTY_NAMES = {
-      informes: 'Información General / Inscripción',
-      lactantes: 'Lactantes y Maternal',
-      tardes: 'Guardería por las Tardes',
-      'consejo-tecnico': 'Cobertura por Consejo Técnico / Suspensión',
-      horario: 'Ajustar un Horario Especial',
-      'no-se': 'aún no sé, quiero información'
-    };
+  function spawnSparks() {
+    const count = W < 768 ? 28 : 50;
+    sparks = Array.from({ length: count }, () => new Spark(Math.random() * H));
+  }
 
-    function showAlert(msg) {
-      alertBox.textContent = msg;
-      alertBox.hidden = false;
+  function drawFrame() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'screen';
+    orbs.forEach(o => { o.tick(); o.draw(); });
+    ctx.globalCompositeOperation = 'source-over';
+    raf = requestAnimationFrame(drawFrame);
+  }
+
+  const visObs = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) { if (!raf) drawFrame(); }
+    else { cancelAnimationFrame(raf); raf = null; }
+  }, { threshold: 0 });
+  visObs.observe(heroEl);
+
+  window.addEventListener('resize', resizeCanvas, { passive: true });
+  resizeCanvas();
+
+  /* ── 10. Cursor glow + sparks + mouse parallax ──────────── */
+  let glowX = -999, glowY = -999;
+
+  /* Parallax state */
+  let pMouseX = 0, pMouseY = 0, pCurrX = 0, pCurrY = 0;
+  const heroGridEl    = document.querySelector('.hero-grid');
+  const heroContentEl = document.querySelector('.hero-content');
+  const heroVigEl     = document.querySelector('.hero-vignette');
+
+  heroEl.addEventListener('mousemove', (e) => {
+    const rect = heroEl.getBoundingClientRect();
+    glowX   = e.clientX - rect.left;
+    glowY   = e.clientY - rect.top;
+    pMouseX = (e.clientX - rect.left) / rect.width  - 0.5;
+    pMouseY = (e.clientY - rect.top)  / rect.height - 0.5;
+  });
+
+  heroEl.addEventListener('mouseleave', () => {
+    glowX = -999; glowY = -999;
+    pMouseX = 0;  pMouseY = 0;
+  });
+
+  function drawFrameWithCursor() {
+    /* Smooth parallax lerp */
+    pCurrX += (pMouseX - pCurrX) * 0.04;
+    pCurrY += (pMouseY - pCurrY) * 0.04;
+    if (heroGridEl)    heroGridEl.style.transform    = `translate(${-pCurrX * 32}px, ${-pCurrY * 20}px)`;
+    if (heroContentEl) heroContentEl.style.transform = `translate(${pCurrX  * 14}px, ${pCurrY  * 10}px)`;
+    if (heroVigEl)     heroVigEl.style.transform     = `translate(${-pCurrX * 10}px, ${-pCurrY *  6}px)`;
+
+    /* Canvas drawing */
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'screen';
+
+    orbs.forEach(o => { o.tick(); o.draw(); });
+    sparks.forEach(s => { s.tick(); s.draw(); });
+
+    /* Cursor spotlight */
+    if (glowX > 0) {
+      const cg = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, 380);
+      cg.addColorStop(0,   'rgba(34,168,229,0.14)');
+      cg.addColorStop(0.4, 'rgba(34,168,229,0.05)');
+      cg.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.arc(glowX, glowY, 380, 0, Math.PI * 2);
+      ctx.fillStyle = cg;
+      ctx.fill();
     }
 
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      var specialtyName = SPECIALTY_NAMES[specialtyEl.value];
-      if (!specialtyName) {
-        showAlert('Selecciona una opción para continuar.');
-        return;
-      }
-
-      var text = 'Hola Bambinis, mi nombre es ' + nameEl.value.trim() +
-        ' (tel. ' + phoneEl.value.trim() + '). Me interesa: ' + specialtyName + '. ' +
-        messageEl.value.trim();
-
-      var url = 'https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent(text);
-      window.open(url, '_blank', 'noopener');
-
-      alertBox.hidden = true;
-      form.reset();
-    });
+    ctx.globalCompositeOperation = 'source-over';
+    raf = requestAnimationFrame(drawFrameWithCursor);
   }
 
-  /* ---------------- Back to top ---------------- */
-  function initBackToTop() {
-    var btn = document.getElementById('back-to-top');
-    if (!btn) return;
-    window.addEventListener('scroll', debounce(function () {
-      btn.classList.toggle('is-visible', window.scrollY > 700);
-    }, 80), { passive: true });
-    btn.addEventListener('click', function () {
-      window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
-    });
-  }
+  visObs.disconnect();
+  const visObs2 = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) { if (!raf) drawFrameWithCursor(); }
+    else { cancelAnimationFrame(raf); raf = null; }
+  }, { threshold: 0 });
+  visObs2.observe(heroEl);
+  if (document.visibilityState === 'visible') drawFrameWithCursor();
 
-  /* ---------------- Footer year ---------------- */
-  function initYear() {
-    var el = document.getElementById('year');
-    if (el) el.textContent = new Date().getFullYear();
-  }
-
-  /* ---------------- Init ---------------- */
-  initPreloader();
-  initReveal();
-  initHeader();
-  initMobileNav();
-  initCounters();
-  initParticles();
-  initHeroParallax();
-  initTilt();
-  initMagnetic();
-  initImageShimmer();
-  initLightbox();
-  initContactForm();
-  initBackToTop();
-  initYear();
-
-})();
+}());
